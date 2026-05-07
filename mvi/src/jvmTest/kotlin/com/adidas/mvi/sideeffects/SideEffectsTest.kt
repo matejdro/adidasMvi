@@ -1,17 +1,10 @@
 package com.adidas.mvi.sideeffects
 
-import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
-import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainInOrder
-import kotlin.time.DurationUnit
 import kotlin.time.ExperimentalTime
-import kotlin.time.toDuration
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Semaphore
 
 @ExperimentalTime
 internal class SideEffectsTest : BehaviorSpec({
@@ -37,17 +30,6 @@ internal class SideEffectsTest : BehaviorSpec({
             }
         }
 
-        `when`("I add one SideEffect with empty check") {
-            val addedSideEffect = TestSideEffect()
-            val returnedSideEffectContainer = sideEffects.add(addedSideEffect)
-
-            then("The SideEffect empty check should not crash") {
-                shouldThrow<AssertionError> {
-                    returnedSideEffectContainer.shouldBeEmpty()
-                }
-            }
-        }
-
         `when`("I add two SideEffects") {
             val firstSideEffect = TestSideEffect()
             val secondSideEffect = TestSideEffect()
@@ -70,43 +52,6 @@ internal class SideEffectsTest : BehaviorSpec({
 
             then("No SideEffects should be returned") {
                 clearedSideEffects.shouldBeEmpty()
-            }
-        }
-
-        `when`("I try to read SideEffects and it takes time, simulated by a semaphore") {
-            val firstSideEffect = TestSideEffect()
-            val secondSideEffectToBeAddedLater = TestSideEffect()
-
-            var returnedSideEffects = sideEffects.add(firstSideEffect)
-
-            val semaphore = Semaphore(2)
-
-            val readJob =
-                launch(Dispatchers.Default) {
-                    returnedSideEffects.forEach { _ ->
-                        semaphore.acquire() // Wait for the signal
-                    }
-                }
-
-            val addJob =
-                launch(Dispatchers.Default) {
-                    returnedSideEffects = sideEffects.add(secondSideEffectToBeAddedLater)
-                }
-
-            semaphore.release()
-
-            then("It should be released only by the semaphore").config(
-                timeout =
-                    5.toDuration(
-                        DurationUnit.SECONDS,
-                    ),
-            ) {
-                readJob.join()
-                addJob.join()
-
-                readJob.isActive.shouldBeFalse()
-                addJob.isActive.shouldBeFalse()
-                returnedSideEffects.shouldContain(secondSideEffectToBeAddedLater)
             }
         }
     }

@@ -9,18 +9,13 @@ import kotlinx.atomicfu.atomic
  * It locks itself, so you can't add and read at the same time, also it's not possible to read it at the same time from different threads, being completely thread-safe.
  */
 
-public class SideEffects<T>() : Iterable<T> {
-    private val sideEffects: AtomicRef<MutableList<T>> = atomic(ArrayList())
+public class SideEffects<T>private constructor(sideEffects: List<T>) : Iterable<T> {
+    private val sideEffects: AtomicRef<List<T>> = atomic(sideEffects)
 
-    // Private constructor to initialize from an Iterable
-    private constructor(sideEffects: Iterable<T>) : this() {
-        this.sideEffects.value.addAll(sideEffects)
-    }
+    public constructor() : this(emptyList())
 
     public fun add(vararg sideEffectsToAdd: T): SideEffects<T> {
-        val newList = sideEffects.value.toMutableList()
-        newList.addAll(sideEffectsToAdd)
-        return SideEffects(newList)
+        return SideEffects(sideEffects.value + sideEffectsToAdd)
     }
 
     public fun clear(): SideEffects<T> {
@@ -28,16 +23,6 @@ public class SideEffects<T>() : Iterable<T> {
     }
 
     override fun iterator(): Iterator<T> {
-        return SideEffectsIterator()
-    }
-
-    private inner class SideEffectsIterator : Iterator<T> {
-        override fun next(): T {
-            return sideEffects.value.removeFirst()
-        }
-
-        override fun hasNext(): Boolean {
-            return sideEffects.value.isNotEmpty()
-        }
+        return sideEffects.getAndSet(emptyList()).iterator()
     }
 }
